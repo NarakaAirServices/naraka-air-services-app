@@ -37,7 +37,7 @@ jobs:
         run: chmod +x ./android/gradlew
 
       - name: Build Android App Bundle
-        run: ./android/gradlew bundleRelease
+        run: cd android && ./gradlew bundleRelease
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
