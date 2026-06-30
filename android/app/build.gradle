@@ -7,10 +7,10 @@ configurations.all {
     }
 }
 android {
-    namespace "com.narakatravels.app"
+    namespace "com.narakaairservices.app"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.narakatravels.app"
+        applicationId "com.narakaairservices.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
