@@ -48,7 +48,7 @@ jobs:
         env:
           STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
-        run: cd android && ./gradlew bundleRelease -Pandroid.injected.signing.store.file=app/upload-keystore.jks -Pandroid.injected.signing.store.password="$STORE_PASSWORD" -Pandroid.injected.signing.key.alias=upload -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+        run: cd android && ./gradlew bundleRelease -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/upload-keystore.jks -Pandroid.injected.signing.store.password="$STORE_PASSWORD" -Pandroid.injected.signing.key.alias=upload -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
 
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
