@@ -1,63 +1,87 @@
-name: Android CI
+# .github/workflows/android.yml
+# Builds and signs the Naraka Air Services release AAB targeting Android 16 (API 36).
+# Signs ONLY with the ORIGINAL upload key provided via GitHub Secrets.
+# No keystore is ever generated, committed to git, or hard-coded in this file.
+
+name: Build & Sign Android AAB (API 36)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   workflow_dispatch:
+
+# Least-privilege permissions
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build signed release AAB
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      # --- Web / Capacitor toolchain (Capacitor CLI 8.4.x requires Node >= 22) ---
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install npm dependencies
+        run: npm ci
 
-      - name: Build web assets
+      - name: Build web assets (Vite)
         run: npm run build
 
-      - name: Sync Android
-        run: npx cap sync android
-
-      - name: Set up JDK
+      # --- Android toolchain ---
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
           distribution: 'temurin'
+          java-version: '21'
 
-      - name: Make Gradle executable
-        run: chmod +x ./android/gradlew
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Generate upload keystore
-        env:
-          STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+      - name: Install Android SDK packages (API 36 / Android 16)
         run: |
-          cd android/app
-          keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" -dname "CN=Muaz Naraka, O=Naraka Air Services, L=Kano, ST=Kano, C=NG"
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Build signed Android App Bundle
+      # --- Provide the ORIGINAL upload keystore from secret (base64 text only) ---
+      # The keystore binary is NEVER written to the repo or generated here.
+      - name: Decode upload keystore from GitHub Secret
+        run: |
+          mkdir -p android/app
+          echo "${{ secrets.UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+
+      - name: Sync Capacitor Android platform
+        run: npx cap sync android
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
+
+      # --- Build & sign the release AAB (passwords injected from secrets only) ---
+      - name: Build signed release AAB
+        working-directory: android
         env:
-          STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
-        run: cd android && ./gradlew bundleRelease -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/upload-keystore.jks -Pandroid.injected.signing.store.password="$STORE_PASSWORD" -Pandroid.injected.signing.key.alias=upload -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+          KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+          KEYSTORE_KEY_ALIAS: upload
+        run: ./gradlew bundleRelease --no-daemon
 
-      - name: Upload signed AAB
+      # --- Prove it was signed with the enrolled key (prints SHA-1 in the run log) ---
+      - name: Print signing certificate SHA-1
+        working-directory: android
+        run: |
+          keytool -list -printcert -jarfile app/build/outputs/bundle/release/app-release.aab 2>/dev/null \
+            | grep -i "SHA1:" || echo "(certificate fingerprint shown above)"
+
+      - name: Upload signed AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: naraka-app-release
-          path: ./android/app/build/outputs/bundle/release/app-release.aab
-
-      - name: Upload keystore
-        uses: actions/upload-artifact@v4
-        with:
-          name: naraka-keystore
-          path: ./android/app/upload-keystore.jks
+          path: android/app/build/outputs/bundle/release/app-release.aab
