@@ -1,4 +1,4 @@
-package com.narakatravels.app;
+package com.narakaairservices.app;
 
 import com.getcapacitor.BridgeActivity;
 
