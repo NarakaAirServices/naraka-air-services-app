@@ -46,7 +46,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          package: ''
+          package: 'platform-tools'
 
       - name: Install Android SDK packages (API 36 / Android 16)
         run: |
